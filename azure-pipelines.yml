@@ -1,0 +1,47 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - CloudServer/**
+
+pool:
+  name: "Default"
+
+steps:
+  - checkout: self
+    persistCredentials: true
+
+  - script: |
+      git config --global user.email "bogdan.dumitrescu02@stud.acs.upb.ro"
+      git config --global user.name "dumibxd26"
+      git remote remove github || true
+      git remote remove azure || true
+      git remote add github https://$(GITHUB_TOKEN)@github.com/dumibxd26/HouseSecuritySystem.git
+      git remote add azure https://$(AZURE_TOKEN)@dev.azure.com/bogdandumitrescu02/HouseSecuritySystemCloud/_git/HouseSecuritySystemCloud
+      git fetch github
+      git fetch azure
+      git checkout main || git checkout -b main
+      git pull --rebase github main
+      git subtree split --prefix=CloudServer -b temp-branch
+
+      mkdir ../temp-dir
+      cd ../temp-dir
+      git init
+      git remote add azure https://$(AZURE_TOKEN)@dev.azure.com/bogdandumitrescu02/HouseSecuritySystemCloud/_git/HouseSecuritySystemCloud
+      git fetch azure
+      git checkout -b main
+
+      # Remove all directories except CloudServer
+      find . -maxdepth 1 -type d ! -name '.' ! -name 'CloudServer' -exec rm -rf {} +
+
+      cp -r ../$(Build.SourcesDirectory)/CloudServer/* CloudServer/
+
+      git add .
+      git commit -m "Keep only CloudServer directory"
+      git push --force azure main
+    env:
+      GITHUB_TOKEN: $(System.AccessToken)
+      AZURE_TOKEN: $(System.AccessToken)
+    displayName: "Sync CloudServer Directory from GitHub to Azure DevOps"
