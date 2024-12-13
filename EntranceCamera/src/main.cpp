@@ -5,7 +5,6 @@
 #include "img_converters.h"
 #include "Arduino.h"
 #include "camera_pins.h"
-#include <PubSubClient.h> 
 
 // Wi-Fi credentials
 const char *ssid = "DIGI-27Xy";
@@ -15,14 +14,6 @@ const char *password = "3CfkabA5aa";
 const char *hub_address = "192.168.1.100"; // Replace with the hub's IP
 const int hub_port = 5000;
 const char *board_name = "EntranceCamera";
-
-// MQTT configuration
-const int mqtt_port = 1883;
-const char *topic_capture_image = "capture_image";
-const char *topic_live_video = "live_video";
-
-WiFiClient espClient;
-PubSubClient mqttClient(espClient);
 
 // HTTP server handle
 httpd_handle_t camera_httpd = NULL;
@@ -55,10 +46,6 @@ camera_config_t camera_config = {
 
 // Function prototypes
 void connectToWiFi();
-void startMQTT();
-void mqttCallback(char *topic, byte *message, unsigned int length);
-void sendImageToMQTT();
-void reconnectMQTT();
 void startServer();
 void registerCamera();
 static esp_err_t capture_handler(httpd_req_t *req);
@@ -92,76 +79,6 @@ void connectToWiFi()
             delay(1000); // Halt execution
         }
     }
-}
-
-// MQTT setup
-void startMQTT()
-{
-    mqttClient.setServer(hub_address, mqtt_port);
-    mqttClient.setCallback(mqttCallback);
-    reconnectMQTT();
-}
-
-void reconnectMQTT()
-{
-    while (!mqttClient.connected())
-    {
-        Serial.print("Attempting MQTT connection...");
-        if (mqttClient.connect(board_name))
-        {
-            Serial.println("Connected to MQTT broker!");
-            mqttClient.subscribe(topic_live_video); // Subscribe to the live video command topic
-        }
-        else
-        {
-            Serial.print("Failed to connect, rc=");
-            Serial.print(mqttClient.state());
-            Serial.println(" retrying in 5 seconds...");
-            delay(5000);
-        }
-    }
-}
-
-// MQTT message callback
-void mqttCallback(char *topic, byte *message, unsigned int length)
-{
-    String msg;
-    for (unsigned int i = 0; i < length; i++)
-    {
-        msg += (char)message[i];
-    }
-
-    Serial.println("Received message on topic: " + String(topic));
-    Serial.println("Message: " + msg);
-
-    if (String(topic) == topic_capture_image && msg == "{\"action\":\"capture\"}")
-    {
-        Serial.println("Capture request received via MQTT.");
-        sendImageToMQTT();
-    }
-}
-
-// Send captured image to MQTT
-void sendImageToMQTT()
-{
-    camera_fb_t *fb = esp_camera_fb_get();
-    if (!fb)
-    {
-        Serial.println("Camera capture failed");
-        return;
-    }
-
-    if (mqttClient.connected())
-    {
-        mqttClient.publish(topic_capture_image, fb->buf, fb->len); // Publish the image buffer
-        Serial.println("Image published to MQTT broker!");
-    }
-    else
-    {
-        Serial.println("MQTT client not connected. Cannot send image.");
-    }
-
-    esp_camera_fb_return(fb); // Free the frame buffer
 }
 
 // Camera registration with hub
@@ -344,16 +261,9 @@ void setup()
 
     // Register the camera with the hub
     registerCamera();
-
-    // Start MQTT
-    startMQTT();
 }
 
 void loop()
 {
-    if (!mqttClient.connected())
-    {
-        reconnectMQTT();
-    }
-    mqttClient.loop(); // Process MQTT messages
+    
 }

@@ -2,6 +2,8 @@
 #include <HTTPClient.h>
 #include <Adafruit_Fingerprint.h>
 #include <ESP32Servo.h>
+#include <esp_http_server.h>
+#include "FS.h"
 
 // Pin definitions
 #define RX_PIN 16
@@ -22,9 +24,10 @@ const char* password_secondary = "MobilePassword";
 
 const char* hub_primary = "192.168.1.100"; // Bound to primary network
 const char* hub_secondary = "192.168.1.43"; // Bound to secondary network
-const char* PORT = "8080";
+const char* PORT = "5000";
 String hub_address = "";
 const char* board_name = "FrontDoorESP32";
+bool alarmActivated = false;
 
 // Fingerprint sensor
 Adafruit_Fingerprint finger(&Serial2);
@@ -202,12 +205,83 @@ void handleSuccess() {
 }
 
 void handleFailure() {
+    alarmActivated = true;
     for (int i = 0; i < 3; i++) {
         setRGBColor(255, 0, 0);
         buzz(200);
         delay(500);
         setRGBColor(0, 0, 0);
         delay(500);
+    }
+}
+
+// Handler for activating the alarm
+
+esp_err_t activate_alarm_handler(httpd_req_t *req) {
+    // Activate the alarm
+    alarmActivated = true;
+
+    // Turn on the buzzer and RGB LED as alarm indicators
+    digitalWrite(BUZZER_PIN, HIGH);
+    setRGBColor(255, 0, 0); // Red color for active alarm
+
+    Serial.println("Alarm activated!");
+
+    // Send response
+    const char *resp = "Alarm activated!";
+    httpd_resp_send(req, resp, strlen(resp));
+
+    return ESP_OK;
+}
+
+// Handler for deactivating the alarm
+esp_err_t deactivate_alarm_handler(httpd_req_t *req) {
+    // Deactivate the alarm
+    alarmActivated = false;
+
+    // Turn off the buzzer and RGB LED
+    digitalWrite(BUZZER_PIN, LOW);
+    setRGBColor(0, 0, 0); // Turn off the LED
+
+    Serial.println("Alarm deactivated!");
+
+    // Send response
+    const char *resp = "Alarm deactivated!";
+    httpd_resp_send(req, resp, strlen(resp));
+
+    return ESP_OK;
+}
+
+// Function to start the HTTP server and register routes
+void startServer() {
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+
+    // URI for activating the alarm
+    httpd_uri_t activate_alarm = {
+        .uri = "/activate_alarm",
+        .method = HTTP_POST,
+        .handler = activate_alarm_handler,
+        .user_ctx = NULL
+    };
+
+    // URI for deactivating the alarm
+    httpd_uri_t deactivate_alarm = {
+        .uri = "/deactivate_alarm",
+        .method = HTTP_POST,
+        .handler = deactivate_alarm_handler,
+        .user_ctx = NULL
+    };
+
+    // Start the HTTP server
+    httpd_handle_t server = NULL;
+    if (httpd_start(&server, &config) == ESP_OK) {
+        // Register the routes
+        httpd_register_uri_handler(server, &activate_alarm);
+        httpd_register_uri_handler(server, &deactivate_alarm);
+
+        Serial.println("HTTP server started and routes registered.");
+    } else {
+        Serial.println("Failed to start the HTTP server.");
     }
 }
 
@@ -251,6 +325,9 @@ void setup() {
     setupWiFiAndHub();
 
     registerBoard();
+
+    // Start the HTTP server
+    startServer();
 }
 
 void loop() {
