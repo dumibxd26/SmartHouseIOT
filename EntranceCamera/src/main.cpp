@@ -1,18 +1,24 @@
 #include "esp_camera.h"
 #include "WiFi.h"
 #include "esp_http_server.h"
+#include <HTTPClient.h>
 #include "esp_timer.h"
 #include "img_converters.h"
 #include "Arduino.h"
 #include "camera_pins.h"
+#include "credentials.h"
 
 // Wi-Fi credentials
-const char *ssid = "DIGI-27Xy";
-const char *password = "3CfkabA5aa";
+const char* ssid_primary = SSID_PRIMARY;
+const char* password_primary = PASSWORD_PRIMARY;
+const char* ssid_secondary = SSID_SECONDARY;
+const char* password_secondary = PASSWORD_SECONDARY;
 
 // Hub configuration
-const char *hub_address = "192.168.1.100"; // Replace with the hub's IP
-const int hub_port = 5000;
+const char* hub_primary = HUB_PRIMARY // Bound to primary network
+const char* hub_secondary = HUB_SECONDARY // Bound to secondary network
+const char* PORT = PORT_C;
+String hub_address = "";
 const char *board_name = "EntranceCamera";
 
 // HTTP server handle
@@ -45,96 +51,82 @@ camera_config_t camera_config = {
     .fb_count = 1};
 
 // Function prototypes
-void connectToWiFi();
+bool connectToWiFi(const char* ssid, const char* password);
 void startServer();
-void registerCamera();
 static esp_err_t capture_handler(httpd_req_t *req);
 static esp_err_t live_video_handler(httpd_req_t *req);
-static esp_err_t simple_get_handler(httpd_req_t *req);
 
 // Wi-Fi setup
-void connectToWiFi()
-{
+bool connectToWiFi(const char* ssid, const char* password) {
     WiFi.begin(ssid, password);
-    Serial.println("Connecting to Wi-Fi...");
+    Serial.print("Connecting to Wi-Fi: ");
+    Serial.println(ssid);
 
-    int retries = 30; // Allow up to 30 seconds to connect
-    while (WiFi.status() != WL_CONNECTED && retries > 0)
-    {
-        delay(1000);
+    int retries = 20; // Retry limit
+    while (WiFi.status() != WL_CONNECTED && retries > 0) {
+        delay(500);
         Serial.print(".");
         retries--;
     }
 
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        Serial.println("WiFi connected!");
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nConnected to Wi-Fi: " + String(ssid));
         Serial.println("IP Address: " + WiFi.localIP().toString());
-    }
-    else
-    {
-        Serial.println("Failed to connect to Wi-Fi. Check credentials and network availability.");
-        while (true)
-        {
-            delay(1000); // Halt execution
-        }
+        return true;
+    } else {
+        Serial.println("\nFailed to connect to Wi-Fi: " + String(ssid));
+        return false;
     }
 }
 
-// Camera registration with hub
-void registerCamera()
-{
-    if (WiFi.status() != WL_CONNECTED)
-    {
-        Serial.println("WiFi not connected. Cannot register camera.");
-        return;
+// Function to test hub connectivity
+bool testHubConnection(const char* hub_ip) {
+    HTTPClient http;
+    String test_url = String("http://") + hub_ip + ":" + PORT + "/test";
+    http.begin(test_url);
+    int httpCode = http.GET();
+    http.end();
+    return (httpCode == 200);
+}
+
+// Connect to the appropriate Wi-Fi and assign hub address
+void setupWiFiAndHub() {
+    if (connectToWiFi(ssid_primary, password_primary)) {
+        hub_address = hub_primary;
+    } else if (connectToWiFi(ssid_secondary, password_secondary)) {
+        hub_address = hub_secondary;
+    } else {
+        Serial.println("Failed to connect to any Wi-Fi network. Halting...");
+        while (true); // Halt execution if no Wi-Fi connection
     }
 
-    WiFiClient client;
-    if (client.connect(hub_address, hub_port))
-    {
-        String postData = "{\"name\":\"" + String(board_name) + "\",\"ip\":\"" + WiFi.localIP().toString() + "\"}";
-        client.println("POST /register HTTP/1.1");
-        client.println("Host: " + String(hub_address) + ":" + String(hub_port));
-        client.println("Content-Type: application/json");
-        client.println("Connection: close");
-        client.println("Content-Length: " + String(postData.length()));
-        client.println();
-        client.println(postData);
-
-        String response;
-        bool headersEnded = false;
-        while (client.connected())
-        {
-            String line = client.readStringUntil('\n');
-            if (!headersEnded)
-            {
-                if (line == "\r")
-                {
-                    headersEnded = true;
-                }
-            }
-            else
-            {
-                response += line;
-            }
-        }
-
-        Serial.println("Hub response: " + response);
-
-        if (response.indexOf("\"status\":\"success\"") != -1)
-        {
-            Serial.println("Camera successfully registered with the hub.");
-        }
-        else
-        {
-            Serial.println("Camera registration failed. Response: " + response);
-        }
+    if (!testHubConnection(hub_address.c_str())) {
+        Serial.println("[ERROR] Hub connection failed. Retrying...");
+        while (true) delay(5000); // Halt or retry logic
     }
-    else
-    {
-        Serial.println("Failed to connect to hub for registration.");
+}
+
+// Register the board with the hub
+void registerBoard() {
+    if (hub_address == "") return;
+    HTTPClient http;
+    http.begin(String("http://") + hub_address + ":" + PORT + "/register");
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{\"name\":\"" + String(board_name) + "\",\"ip\":\"" + WiFi.localIP().toString() + "\"}";
+    int httpCode = http.POST(payload);
+    if (httpCode == 200) {
+        Serial.println("Board registered successfully.");
+    } else {
+        Serial.println("Failed to register board. HTTP code: " + String(httpCode));
     }
+    http.end();
+}
+
+esp_err_t test_handler(httpd_req_t *req) {
+    const char *resp = "Board works!";
+    httpd_resp_send(req, resp, strlen(resp));
+    return ESP_OK;
 }
 
 // HTTP server setup
@@ -154,43 +146,40 @@ void startServer()
         .handler = live_video_handler,
         .user_ctx = NULL};
 
-    httpd_uri_t simple_get_uri = {
-        .uri = "/simple_get",
+    httpd_uri_t test = {
+        .uri = "/test",
         .method = HTTP_GET,
-        .handler = simple_get_handler,
-        .user_ctx = NULL};
+        .handler = test_handler,
+        .user_ctx = NULL
+    };
 
     if (httpd_start(&camera_httpd, &config) == ESP_OK)
     {
         httpd_register_uri_handler(camera_httpd, &capture_uri);
         httpd_register_uri_handler(camera_httpd, &live_video_uri);
-        httpd_register_uri_handler(camera_httpd, &simple_get_uri);
+        httpd_register_uri_handler(camera_httpd, &test);
     }
 }
 
-// HTTP Capture Route
 static esp_err_t capture_handler(httpd_req_t *req)
 {
-    camera_fb_t *fb = esp_camera_fb_get();
-    if (!fb)
-    {
-        Serial.println("Camera capture failed");
-        httpd_resp_send_500(req);
-        return ESP_FAIL;
+    for (int retries = 0; retries < 3; retries++) {
+        camera_fb_t *fb = esp_camera_fb_get();
+        if (fb) {
+            // Send image if capture is successful
+            httpd_resp_set_type(req, "image/jpeg");
+            httpd_resp_set_hdr(req, "Content-Disposition", "inline; filename=capture.jpg");
+            esp_err_t res = httpd_resp_send(req, (const char *)fb->buf, fb->len);
+            esp_camera_fb_return(fb);
+            return res;
+        } else {
+            Serial.println("Camera capture failed. Retrying...");
+            delay(100);
+        }
     }
-
-    httpd_resp_set_type(req, "image/jpeg");
-    httpd_resp_set_hdr(req, "Content-Disposition", "inline; filename=capture.jpg");
-    esp_err_t res = httpd_resp_send(req, (const char *)fb->buf, fb->len);
-    esp_camera_fb_return(fb);
-    return res;
-}
-
-// simple get test route
-static esp_err_t simple_get_handler(httpd_req_t *req)
-{
-    httpd_resp_send(req, "Simple Get", strlen("Simple Get"));
-    return ESP_OK;
+    // After retries, send an error response
+    httpd_resp_send_500(req);
+    return ESP_FAIL;
 }
 
 // Live video stream route
@@ -240,12 +229,9 @@ static esp_err_t live_video_handler(httpd_req_t *req)
 void setup()
 {
     Serial.begin(115200);
-    // Serial.println("Starting ESP32-CAM...");
+    Serial.println("Starting ESP32-CAM...");
 
-    delay(500);
-
-    // Initialize Wi-Fi
-    connectToWiFi();
+    delay(1000);
 
     // Initialize the camera
     if (esp_camera_init(&camera_config) != ESP_OK)
@@ -256,11 +242,13 @@ void setup()
             delay(1000); // Halt execution
         }
     }
-    // Start the HTTP server
-    startServer();
+    // Connect to Wi-Fi and set hub address
+    setupWiFiAndHub();
+
+    registerBoard();
 
     // Register the camera with the hub
-    registerCamera();
+    startServer();
 }
 
 void loop()

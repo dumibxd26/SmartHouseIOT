@@ -4,6 +4,7 @@
 #include <ESP32Servo.h>
 #include <esp_http_server.h>
 #include "FS.h"
+#include "credentials.h"
 
 // Pin definitions
 #define RX_PIN 16
@@ -17,13 +18,13 @@
 #define BUZZER_PIN 12
 
 // Network and hub configuration
-const char* ssid_primary = "DIGI-27Xy";
-const char* password_primary = "3CfkabA5aa";
-const char* ssid_secondary = "MobileRouter";
-const char* password_secondary = "MobilePassword";
+const char* ssid_primary = SSID_PRIMARY;
+const char* password_primary = PASSWORD_PRIMARY;
+const char* ssid_secondary = SSID_SECONDARY;
+const char* password_secondary = PASSWORD_SECONDARY;
 
-const char* hub_primary = "192.168.1.100"; // Bound to primary network
-const char* hub_secondary = "192.168.1.43"; // Bound to secondary network
+const char* hub_primary = HUB_PRIMARY; // Bound to primary network
+const char* hub_secondary = HUB_SECONDARY; // Bound to secondary network
 const char* PORT = "5000";
 String hub_address = "";
 const char* board_name = "FrontDoorESP32";
@@ -204,15 +205,52 @@ void handleSuccess() {
     setRGBColor(0, 0, 0);
 }
 
-void handleFailure() {
+void handleWrongFingerprint() {
     alarmActivated = true;
+
+    if (!hub_address.isEmpty()) {
+        HTTPClient http;
+        String url = String("http://") + hub_address + ":" + PORT + "/front_door_alarm";
+        http.begin(url);
+        http.addHeader("Content-Type", "application/json");
+
+        String payload = "{\"message\":\"Front Door Alarm Triggered\",\"timestamp\":\"" + String(millis()) + "\"}";
+
+        int httpCode = http.POST(payload); 
+        if (httpCode == 200) {
+            Serial.println("Front Door Alarm notification sent successfully.");
+        } else {
+            Serial.println("Failed to send Front Door Alarm notification. HTTP code: " + String(httpCode));
+        }
+        http.end();
+    } else {
+        Serial.println("Hub address is empty. Cannot send Front Door Alarm notification.");
+    }
+
     for (int i = 0; i < 3; i++) {
-        setRGBColor(255, 0, 0);
-        buzz(200);
+        setRGBColor(255, 0, 0); // Red color for alarm
+        buzz(200);              // Sound the buzzer
         delay(500);
-        setRGBColor(0, 0, 0);
+        setRGBColor(0, 0, 0);   // Turn off LED
         delay(500);
     }
+}
+
+void sendMovementEvent(int distance) {
+    if (hub_address == "") return;
+    
+    HTTPClient http;
+    http.begin(String("http://") + hub_address + ":" + PORT + "/movement_event");
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{\"name\":\"FrontDoorESP32\",\"distance\":" + String(distance) + "}";
+    int httpCode = http.POST(payload);
+    if (httpCode == 200) {
+        Serial.println("Movement event sent successfully.");
+    } else {
+        Serial.println("Failed to send movement event. HTTP code: " + String(httpCode));
+    }
+    http.end();
 }
 
 // Handler for activating the alarm
@@ -252,6 +290,13 @@ esp_err_t deactivate_alarm_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+// test route
+esp_err_t test_handler(httpd_req_t *req) {
+    const char *resp = "Board works!";
+    httpd_resp_send(req, resp, strlen(resp));
+    return ESP_OK;
+}
+
 // Function to start the HTTP server and register routes
 void startServer() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -271,6 +316,13 @@ void startServer() {
         .handler = deactivate_alarm_handler,
         .user_ctx = NULL
     };
+    
+    httpd_uri_t test = {
+        .uri = "/test",
+        .method = HTTP_GET,
+        .handler = test_handler,
+        .user_ctx = NULL
+    };
 
     // Start the HTTP server
     httpd_handle_t server = NULL;
@@ -278,7 +330,7 @@ void startServer() {
         // Register the routes
         httpd_register_uri_handler(server, &activate_alarm);
         httpd_register_uri_handler(server, &deactivate_alarm);
-
+	    httpd_register_uri_handler(server, &test);
         Serial.println("HTTP server started and routes registered.");
     } else {
         Serial.println("Failed to start the HTTP server.");
@@ -349,6 +401,8 @@ void loop() {
             setRGBColor(0, 0, 255); // Blue: Waiting for fingerprint
             waitingForFingerprint = true;
             fingerprintStartTime = currentMillis;
+
+            sendMovementEvent(distance);
         }
 
         presenceEndTime = currentMillis; // Update the presence end time
@@ -378,7 +432,7 @@ void loop() {
         } else {
             Serial.println("Fingerprint not recognized within 20 seconds.");
             setRGBColor(255, 0, 0); // Red: Access denied
-            handleFailure();
+            handleWrongFingerprint();
             waitingForFingerprint = false;
             personDetected = false;
             setRGBColor(0, 0, 0); // Turn off LED
