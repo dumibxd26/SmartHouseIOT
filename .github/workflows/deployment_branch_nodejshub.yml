@@ -6,7 +6,7 @@ name: Build and deploy Node.js app to Azure Web App - NodeJsHub
 on:
   push:
     branches:
-      - main
+      - deployment_branch
   workflow_dispatch:
 
 jobs:
@@ -19,22 +19,16 @@ jobs:
       - name: Set up Node.js version
         uses: actions/setup-node@v3
         with:
-          node-version: "20.x"
-
-      - name: Navigate to pi_server folder
-        working-directory: ./pi_server
-        run: echo "Working directory switched to pi_server"
+          node-version: '20.x'
 
       - name: npm install, build, and test
-        working-directory: ./pi_server
         run: |
           npm install
           npm run build --if-present
           npm run test --if-present
 
       - name: Zip artifact for deployment
-        working-directory: ./pi_server
-        run: zip ../release.zip ./* -r
+        run: zip release.zip ./* -r
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -46,10 +40,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     environment:
-      name: "Production"
+      name: 'Production'
       url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
     permissions:
-      id-token: write # This is required for requesting the JWT
+      id-token: write #This is required for requesting the JWT
 
     steps:
       - name: Download artifact from build job
@@ -59,18 +53,19 @@ jobs:
 
       - name: Unzip artifact for deployment
         run: unzip release.zip
-
+      
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_5F859C352C07404AB563ACE4F92273A7 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_E5E8EF74AA0E481FA6B8E7F7B8BE9B6D }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_880711EBB11E421B84C792717C5EC2F3 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_DE2CC7F5B1744252ADD09F2B2A654934 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_FE755B76DD9644D594E972A17D028E03 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_93B03F0652114347AA3A1B0BA4AC51E1 }}
 
-      - name: "Deploy to Azure Web App"
+      - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: "NodeJsHub"
-          slot-name: "Production"
+          app-name: 'NodeJsHub'
+          slot-name: 'Production'
           package: .
+          
