@@ -9,15 +9,15 @@
 #include "credentials.h"
 
 // Wi-Fi credentials
-const char* ssid_primary = SSID_PRIMARY;
-const char* password_primary = PASSWORD_PRIMARY;
-const char* ssid_secondary = SSID_SECONDARY;
-const char* password_secondary = PASSWORD_SECONDARY;
+const char *ssid_primary = SSID_PRIMARY;
+const char *password_primary = PASSWORD_PRIMARY;
+const char *ssid_secondary = SSID_SECONDARY;
+const char *password_secondary = PASSWORD_SECONDARY;
 
 // Hub configuration
-const char* hub_primary = HUB_PRIMARY // Bound to primary network
-const char* hub_secondary = HUB_SECONDARY // Bound to secondary network
-const char* PORT = PORT_C;
+const char *hub_primary = HUB_PRIMARY;     // Bound to primary network
+const char *hub_secondary = HUB_SECONDARY; // Bound to secondary network
+const char *PORT = PORT_C;
 String hub_address = "";
 const char *board_name = "EntranceCamera";
 
@@ -51,36 +51,42 @@ camera_config_t camera_config = {
     .fb_count = 1};
 
 // Function prototypes
-bool connectToWiFi(const char* ssid, const char* password);
+bool connectToWiFi(const char *ssid, const char *password);
 void startServer();
 static esp_err_t capture_handler(httpd_req_t *req);
 static esp_err_t live_video_handler(httpd_req_t *req);
 
 // Wi-Fi setup
-bool connectToWiFi(const char* ssid, const char* password) {
+bool connectToWiFi(const char *ssid, const char *password)
+{
     WiFi.begin(ssid, password);
     Serial.print("Connecting to Wi-Fi: ");
     Serial.println(ssid);
 
     int retries = 20; // Retry limit
-    while (WiFi.status() != WL_CONNECTED && retries > 0) {
+    while (WiFi.status() != WL_CONNECTED && retries > 0)
+    {
         delay(500);
         Serial.print(".");
         retries--;
     }
 
-    if (WiFi.status() == WL_CONNECTED) {
+    if (WiFi.status() == WL_CONNECTED)
+    {
         Serial.println("\nConnected to Wi-Fi: " + String(ssid));
         Serial.println("IP Address: " + WiFi.localIP().toString());
         return true;
-    } else {
+    }
+    else
+    {
         Serial.println("\nFailed to connect to Wi-Fi: " + String(ssid));
         return false;
     }
 }
 
 // Function to test hub connectivity
-bool testHubConnection(const char* hub_ip) {
+bool testHubConnection(const char *hub_ip)
+{
     HTTPClient http;
     String test_url = String("http://") + hub_ip + ":" + PORT + "/test";
     http.begin(test_url);
@@ -90,40 +96,55 @@ bool testHubConnection(const char* hub_ip) {
 }
 
 // Connect to the appropriate Wi-Fi and assign hub address
-void setupWiFiAndHub() {
-    if (connectToWiFi(ssid_primary, password_primary)) {
+void setupWiFiAndHub()
+{
+    if (connectToWiFi(ssid_primary, password_primary))
+    {
         hub_address = hub_primary;
-    } else if (connectToWiFi(ssid_secondary, password_secondary)) {
+    }
+    else if (connectToWiFi(ssid_secondary, password_secondary))
+    {
         hub_address = hub_secondary;
-    } else {
+    }
+    else
+    {
         Serial.println("Failed to connect to any Wi-Fi network. Halting...");
-        while (true); // Halt execution if no Wi-Fi connection
+        while (true)
+            ; // Halt execution if no Wi-Fi connection
     }
 
-    if (!testHubConnection(hub_address.c_str())) {
+    if (!testHubConnection(hub_address.c_str()))
+    {
         Serial.println("[ERROR] Hub connection failed. Retrying...");
-        while (true) delay(5000); // Halt or retry logic
+        while (true)
+            delay(5000); // Halt or retry logic
     }
 }
 
 // Register the board with the hub
-void registerBoard() {
-    if (hub_address == "") return;
+void registerBoard()
+{
+    if (hub_address == "")
+        return;
     HTTPClient http;
     http.begin(String("http://") + hub_address + ":" + PORT + "/register");
     http.addHeader("Content-Type", "application/json");
 
     String payload = "{\"name\":\"" + String(board_name) + "\",\"ip\":\"" + WiFi.localIP().toString() + "\"}";
     int httpCode = http.POST(payload);
-    if (httpCode == 200) {
+    if (httpCode == 200)
+    {
         Serial.println("Board registered successfully.");
-    } else {
+    }
+    else
+    {
         Serial.println("Failed to register board. HTTP code: " + String(httpCode));
     }
     http.end();
 }
 
-esp_err_t test_handler(httpd_req_t *req) {
+esp_err_t test_handler(httpd_req_t *req)
+{
     const char *resp = "Board works!";
     httpd_resp_send(req, resp, strlen(resp));
     return ESP_OK;
@@ -150,8 +171,7 @@ void startServer()
         .uri = "/test",
         .method = HTTP_GET,
         .handler = test_handler,
-        .user_ctx = NULL
-    };
+        .user_ctx = NULL};
 
     if (httpd_start(&camera_httpd, &config) == ESP_OK)
     {
@@ -163,16 +183,20 @@ void startServer()
 
 static esp_err_t capture_handler(httpd_req_t *req)
 {
-    for (int retries = 0; retries < 3; retries++) {
+    for (int retries = 0; retries < 3; retries++)
+    {
         camera_fb_t *fb = esp_camera_fb_get();
-        if (fb) {
+        if (fb)
+        {
             // Send image if capture is successful
             httpd_resp_set_type(req, "image/jpeg");
             httpd_resp_set_hdr(req, "Content-Disposition", "inline; filename=capture.jpg");
             esp_err_t res = httpd_resp_send(req, (const char *)fb->buf, fb->len);
             esp_camera_fb_return(fb);
             return res;
-        } else {
+        }
+        else
+        {
             Serial.println("Camera capture failed. Retrying...");
             delay(100);
         }
@@ -253,5 +277,4 @@ void setup()
 
 void loop()
 {
-    
 }
