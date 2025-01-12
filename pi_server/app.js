@@ -15,20 +15,25 @@ app.use(bodyParser.json());
 app.use(morgan('combined'));
 app.use(cors());
 
+// Create an HTTP server and bind it to the express app
+const server = http.createServer(app);
+
 // Attach Socket.IO to the server
 const io = new Server(server, {
-    cors: {
-      origin: '*', // Allow all origins (adjust this for production)
-      methods: ['GET', 'POST']
-    }
-  });
+cors: {
+    origin: '*', // Allow all origins (adjust this for production)
+    methods: ['GET', 'POST']
+}
+});
+
+app.use(bodyParser.json());
 
 // Configurations
 
 // In-Memory Data Structures
 const knownBoards = {
     "EntranceCamera": null,    // ESP32-CAM for entrance
-    "FrontDoorESP32": null,    // ESP32 for entrance tasks
+    "FrontDoorESP32": null,    // ESP32 for entrance task
     "ProximityBoard": null     // ESP32 for proximity detection
 };
 
@@ -482,7 +487,8 @@ app.post ('/three_wrong_guesses', async (req, res) => {
 });
 
 // Start the server
-app.listen(port, '0.0.0.0', () => {
+server.listen(port, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${port}`);
     startHeartbeat();
 });
+
