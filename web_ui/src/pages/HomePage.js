@@ -54,7 +54,7 @@ function HomePage() {
     try {
       const response = await axios.post(`${REQ_ADDRESS}/check_password`, { password: pass });
       if (response.status === 200) {
-        await axios.post(`${REQ_ADDRESS}/trigger_all_alarms`, { password: pass });
+        await axios.get(`${REQ_ADDRESS}/activate_alarms`);
         alert('All alarms activated.');
       } else {
         alert('Incorrect password');
@@ -65,15 +65,18 @@ function HomePage() {
     }
   };
 
-
   // Deactivate alarms
   const handleDeactivateAlarms = async () => {
     const pass = prompt('Enter Password:');
-    if (!pass) return;
 
     try {
-      await axios.post(`${REQ_ADDRESS}/deactivate_all_alarms`, { password: pass });
-      alert('All alarms deactivated.');
+      const response = await axios.post(`${REQ_ADDRESS}/check_password`, { password: pass });
+      if (response.status === 200) {
+        await axios.get(`${REQ_ADDRESS}/deactivate_alarms`);
+        alert('All alarms deactivated.');
+      } else {
+        alert('Incorrect password');
+      }
     } catch (error) {
       alert('Failed to deactivate alarms.');
     }

@@ -4,6 +4,7 @@ import './NotificationBell.css';
 
 const NotificationBell = () => {
   const { notifications, unreadNotifications, markAsRead } = useNotifications();
+  const max_visible_notifications = 4;
   const [isOpen, setIsOpen] = useState(false);
 
   // Toggle dropdown and mark all notifications as read
@@ -27,7 +28,7 @@ const NotificationBell = () => {
         <div className="dropdown">
           <h3>Notifications</h3>
           <ul>
-            {notifications.length > 0 ? (
+            {/* {notifications.length > 0 ? (
               notifications.map((notif) => (
                 <li key={notif.id}>
                   <strong>{notif.message}</strong>
@@ -36,7 +37,14 @@ const NotificationBell = () => {
               ))
             ) : (
               <li>No notifications</li>
-            )}
+            )} */}
+
+            {notifications.slice(0, max_visible_notifications).map((notif) => (
+              <li key={notif.id}>
+                <strong>{notif.message}</strong>
+                <em>{new Date(notif.timestamp).toLocaleString()}</em>
+              </li>
+            ))}
           </ul>
         </div>
       )}

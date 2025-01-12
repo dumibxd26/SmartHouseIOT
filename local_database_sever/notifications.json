@@ -41654,5 +41654,119 @@
     "type": "movement_event",
     "message": "Movement Detected: 50 cm",
     "timestamp": "2025-01-12T14:40:27.635Z"
+  },
+  {
+    "id": 1736704603517,
+    "type": "movement_event",
+    "message": "Movement Detected: 50 cm",
+    "timestamp": "2025-01-12T17:56:43.517Z"
+  },
+  {
+    "id": 1736704609696,
+    "type": "movement_event",
+    "message": "Movement Detected: 50 cm",
+    "timestamp": "2025-01-12T17:56:49.696Z"
+  },
+  {
+    "id": 1736704610949,
+    "type": "movement_event",
+    "message": "Movement Detected: 50 cm",
+    "timestamp": "2025-01-12T17:56:50.949Z"
+  },
+  {
+    "id": 1736704623666,
+    "type": "movement_event",
+    "message": "Movement Detected: 50 cm",
+    "timestamp": "2025-01-12T17:57:03.666Z"
+  },
+  {
+    "id": 1736708059364,
+    "type": "front_door_alarm",
+    "message": "Front Door Alarm Triggered",
+    "timestamp": "2025-01-12T18:54:19.364Z"
+  },
+  {
+    "id": 1736712408902,
+    "type": "front_door_alarm",
+    "message": "Front Door Alarm Triggered",
+    "timestamp": "2025-01-12T20:06:48.902Z"
+  },
+  {
+    "id": 1736712475059,
+    "type": "front_door_alarm",
+    "message": "Front Door Alarm Triggered",
+    "timestamp": "2025-01-12T20:07:55.059Z"
+  },
+  {
+    "id": 1736712632942,
+    "type": "front_door_alarm",
+    "message": "Front Door Alarm Triggered",
+    "timestamp": "2025-01-12T20:10:32.942Z"
+  },
+  {
+    "id": 1736712882196,
+    "type": "front_door_alarm",
+    "message": "Front Door Alarm Triggered",
+    "timestamp": "2025-01-12T20:14:42.196Z"
+  },
+  {
+    "id": 1736713057917,
+    "type": "front_door_alarm",
+    "message": "Front Door Alarm Triggered",
+    "timestamp": "2025-01-12T20:17:37.917Z"
+  },
+  {
+    "id": 1736713607806,
+    "type": "front_door_alarm",
+    "message": "Front Door Alarm Triggered",
+    "timestamp": "2025-01-12T20:26:47.806Z"
+  },
+  {
+    "id": 1736713811192,
+    "type": "front_door_alarm",
+    "message": "Front Door Alarm Triggered",
+    "timestamp": "2025-01-12T20:30:11.192Z"
+  },
+  {
+    "id": 1736713962505,
+    "type": "front_door_alarm",
+    "message": "Front Door Alarm Triggered",
+    "timestamp": "2025-01-12T20:32:42.505Z"
+  },
+  {
+    "id": 1736714114889,
+    "type": "front_door_alarm",
+    "message": "Front Door Alarm Triggered",
+    "timestamp": "2025-01-12T20:35:14.889Z"
+  },
+  {
+    "id": 1736714306827,
+    "type": "front_door_alarm",
+    "message": "Front Door Alarm Triggered",
+    "timestamp": "2025-01-12T20:38:26.827Z"
+  },
+  {
+    "id": 1736714320704,
+    "type": "front_door_alarm",
+    "message": "Front Door Alarm Triggered",
+    "timestamp": "2025-01-12T20:38:40.704Z"
+  },
+  {
+    "id": 1736716141329,
+    "type": "movement_event",
+    "message": "Movement Detected: 18 cm",
+    "timestamp": "2025-01-12T21:09:01.329Z"
+  },
+  {
+    "id": 1736716361340,
+    "type": "movement_event",
+    "message": "Movement Detected: 6 cm",
+    "timestamp": "2025-01-12T21:12:41.340Z"
+  },
+  {
+    "id": 1736716377947,
+    "type": "movement_event",
+    "message": "Movement Detected: 7 cm",
+    "timestamp": "2025-01-12T21:12:57.947Z"
   }
 ]

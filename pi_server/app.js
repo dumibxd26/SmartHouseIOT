@@ -16,26 +16,22 @@ app.use(bodyParser.json());
 app.use(morgan('combined'));
 app.use(cors());
 
+// Global Variables
+let send_activate_all_alarms = false;
+let send_deactivate_all_alamrs = false;
+
 // Create an HTTP server and bind it to the express app
 const server = http.createServer(app);
 
-// Attach Socket.IO to the server
-const io = new Server(server, {
-cors: {
-    origin: '*', // Allow all origins (adjust this for production)
-    methods: ['GET', 'POST']
-}
-});
-
 app.use(bodyParser.json());
 
-const generateNotification = (type, message) => ({
-    id: Date.now(),
-    type,
-    message,
-    timestamp: new Date().toISOString(),
+// Attach Socket.IO to the server
+const io = new Server(server, {
+    cors: {
+      origin: '*', // Allow all origins (adjust this for production)
+      methods: ['GET', 'POST']
+    }
   });
-
 
 // Configurations
 
@@ -47,15 +43,15 @@ const knownBoards = {
 };
 
 const boardStatus = {
-    "EntranceCamera": { state: "down", failedPings: 0 },
-    "FrontDoorESP32": { state: "down", failedPings: 0 },
-    "ProximityBoard": { state: "down", failedPings: 0 }
+    "EntranceCamera": { state: "down", lastUpdate: null},
+    "FrontDoorESP32": { state: "down", lastUpdate: null},
+    "ProximityBoard": { state: "down", lastUpdate: null}
 };
 
 const boards_with_alarms = ["FrontDoorESP32", "ProximityBoard"];
 
 // Timeout configuration
-const HEARTBEAT_INTERVAL = 10000; // 10 seconds
+const HEARTBEAT_INTERVAL = 5000; // 10 seconds
 const MAX_FAILED_PINGS = 2;
 
 const notificationQueue = [];      // Queue to store notifications for the web app
@@ -66,11 +62,20 @@ if (!fs.existsSync(imagesDir)) {
     fs.mkdirSync(imagesDir);
 }
 
+const getCurrentTimestamp = () => new Date().toISOString();
+
 // HTTP Routes
 
 // Dummy credentials for authentication
 const USERNAME = 'admin';
 const PASSWORD = 'admin';
+
+const generateNotification = (type, message) => ({
+    id: Date.now(),
+    type,
+    message,
+    timestamp: new Date().toISOString(),
+  });
 
 // Login route
 app.post('/login', (req, res) => {
@@ -95,39 +100,24 @@ app.post('/check_password', (req, res) => {
     }
 });
 
-// Helper function to send heartbeat
-const checkBoardState = async (boardName, boardIP) => {
-    try {
-        const response = await axios.get(`http://${boardIP}/test`);
-        if (response.status === 200) {
-            console.log(`${boardName} is up`);
-            boardStatus[boardName].state = "up";
-            boardStatus[boardName].failedPings = 0; // Reset failed ping count
-        }
-    } catch (error) {
-        console.error(`${boardName} is down or unreachable: ${error.message}`);
-        boardStatus[boardName].failedPings += 1;
-
-        if (boardStatus[boardName].failedPings >= MAX_FAILED_PINGS) {
-            boardStatus[boardName].state = "down";
-        }
-    }
-};
-
-// Function to start the heartbeat
-const startHeartbeat = () => {
-    setInterval(() => {
-        Object.keys(knownBoards).forEach((boardName) => {
-            const boardIP = knownBoards[boardName];
-            if (boardIP) {
-                checkBoardState(boardName, boardIP);
-            }
-        });
-    }, HEARTBEAT_INTERVAL);
-};
-
 // Endpoint to get board statuses
 app.get('/board_statuses', (req, res) => {
+    // sets board_statues to down if no update for 5 seconds
+    Object.keys(boardStatus).forEach((boardName) => {
+        if (boardStatus[boardName].lastUpdate) {
+            const lastUpdate = new Date(boardStatus[boardName].lastUpdate);
+            const now = new Date();
+            const diff = now - lastUpdate;
+            if (diff > 5000) {
+                boardStatus[boardName].state = "down";
+                boardStatus[boardName].lastUpdate = null;
+                knownBoards[boardName] = null;
+            } else 
+                boardStatus[boardName].state = "up";
+            }
+        }
+    );
+
     res.status(200).json({
         status: "success",
         boardStatuses: boardStatus
@@ -161,130 +151,6 @@ app.post('/register', (req, res) => {
     }
 });
 
-// trigger all alarms
-app.post('/trigger_all_alarms', async (req, res) => {
-    const { password } = req.body;
-
-    // Verify password
-    if (password !== PASSWORD) {
-        return res.status(401).json({
-            status: "failure",
-            message: "Unauthorized: Invalid password",
-        });
-    }
-
-    const results = {
-        success: [],
-        failures: []
-    };
-
-    for (const board of boards_with_alarms) {
-        if (!knownBoards[board] || !boardStatus[board].state === "up") {
-            console.error(`${board} is not registered or reachable.`);
-            results.failures.push({
-                board,
-                error: `${board} is not registered or reachable.`,
-            });
-            continue; // Skip this board
-        }
-
-        try {
-            const boardIp = knownBoards[board];
-            const response = await axios.post(`http://${boardIp}/activate_alarm`, {
-                action: "activate"
-            });
-
-            console.log(`Alarm triggered on ${board}: ${response.data.message}`);
-            results.success.push({
-                board,
-                message: response.data.message,
-            });
-        } catch (error) {
-            console.error(`Error triggering alarm on ${board}:`, error.message);
-            results.failures.push({
-                board,
-                error: error.message,
-            });
-        }
-    }
-
-    // Respond with results
-    if (results.failures.length > 0) {
-        return res.status(207).json({
-            status: "partial_success",
-            message: "Some alarms could not be triggered.",
-            results,
-        });
-    }
-
-    res.status(200).json({
-        status: "success",
-        message: "All alarms triggered successfully.",
-        results,
-    });
-});
-
-app.post('/deactivate_all_alarms', async (req, res) => {
-    const { password } = req.body;
-
-    // Verify password
-    if (password !== PASSWORD) {
-        return res.status(401).json({
-            status: "failure",
-            message: "Unauthorized: Invalid password",
-        });
-    }
-
-    const results = {
-        success: [],
-        failures: []
-    };
-
-    for (const board of boards_with_alarms) {
-        if (!knownBoards[board] || !boardStatus[board].state === "up") {
-            console.error(`${board} is not registered or reachable.`);
-            results.failures.push({
-                board,
-                error: `${board} is not registered or reachable.`,
-            });
-            continue; // Skip this board
-        }
-
-        try {
-            const boardIp = knownBoards[board];
-            const response = await axios.post(`http://${boardIp}/deactivate_alarm`, {
-                action: "deactivate"
-            });
-
-            console.log(`Alarm deactivated on ${board}: ${response.data.message}`);
-            results.success.push({
-                board,
-                message: response.data.message,
-            });
-        } catch (error) {
-            console.error(`Error deactivating alarm on ${board}:`, error.message);
-            results.failures.push({
-                board,
-                error: error.message,
-            });
-        }
-    }
-
-    // Respond with results
-    if (results.failures.length > 0) {
-        return res.status(207).json({
-            status: "partial_success",
-            message: "Some alarms could not be deactivated.",
-            results,
-        });
-    }
-
-    res.status(200).json({
-        status: "success",
-        message: "All alarms deactivated successfully.",
-        results,
-    });
-});
 
 // Get Notifications (For the web app to retrieve alarm notifications)
 app.get('/notifications', (req, res) => {
@@ -297,118 +163,32 @@ app.get('/notifications', (req, res) => {
     // notificationQueue.length = 0;
 });
 
-// Trigger alarms on a specific board via HTTP requests
-app.post('/trigger_alarm', async (req, res) => {
-    const { board, password } = req.body;
+app.get("/activate_alarms", (req, res) => {
 
-    // Verify password
-    if (password !== PASSWORD) {
-        return res.status(401).json({
-            status: "failure",
-            message: "Unauthorized: Invalid password",
-        });
+    // Activate alarms on all boards with alarms
+    if (send_deactivate_all_alamrs) {
+        send_deactivate_all_alamrs = false;
     }
+    send_activate_all_alarms = true;
 
-    if (!knownBoards[board] || !knownBoards[board]) {
-        return res.status(400).json({
-            status: "failure",
-            message: `${board} is not registered or reachable.`,
-        });
-    }
-
-    try {
-        const boardIp = knownBoards[board];
-        const response = await axios.post(`http://${boardIp}/trigger_alarm`, {
-            action: "activate"
-        });
-
-        res.status(200).json({
-            status: "success",
-            message: `Alarm triggered on ${board}: ${response.data.message}`,
-        });
-    } catch (error) {
-        console.error(`Error triggering alarm on ${board}:`, error.message);
-        res.status(500).json({
-            status: "failure",
-            message: `Failed to trigger alarm on ${board}`,
-        });
-    }
+    res.status(200).json({
+        status: "success",
+        message: "All alarms activated",
+    });
 });
 
-// Live Video Access (HTTP Route)
-app.get('/live_video', async (req, res) => {
-    if (!knownBoards["EntranceCamera"]) {
-        return res.status(400).json({
-            status: "failure",
-            message: "EntranceCamera not registered",
-        });
+app.get("/deactivate_alarms", (req, res) => {
+    
+    // Deactivate alarms on all boards with alarms
+    if (send_activate_all_alarms) {
+        send_activate_all_alarms = false;
     }
+    send_deactivate_all_alamrs = true;
 
-    const ip = knownBoards["EntranceCamera"];
-    const esp32StreamUrl = `http://${ip}/live_video`;
-
-    console.log('Forwarding video stream from ESP32-CAM:', esp32StreamUrl);
-
-    try {
-        const response = await axios.get(esp32StreamUrl, { responseType: 'stream' });
-
-        // Forward necessary headers only
-        res.setHeader('Content-Type', response.headers['content-type']);
-        // Don't forward Content-Length if it's undefined
-        if (response.headers['content-length']) {
-            res.setHeader('Content-Length', response.headers['content-length']);
-        }
-
-        // Forward the stream
-        response.data.pipe(res);
-    } catch (err) {
-        console.error('Error connecting to ESP32-CAM:', err.message);
-        res.status(500).json({
-            status: "failure",
-            message: "Failed to fetch live video from ESP32-CAM",
-        });
-    }
-});
-
-
-// Capture Image from Camera
-app.post('/capture_image', async (req, res) => {
-    const { password } = req.body;
-
-    // Verify password
-    if (password !== PASSWORD) {
-        return res.status(401).json({
-            status: "failure",
-            message: "Unauthorized: Invalid password",
-        });
-    }
-
-    if (!knownBoards["EntranceCamera"]) {
-        return res.status(400).json({
-            status: "failure",
-            message: "EntranceCamera not registered",
-        });
-    }
-
-    try {
-        const ip = knownBoards["EntranceCamera"];
-        const response = await axios.get(`http://${ip}/capture`, { responseType: 'arraybuffer' });
-
-        const fileName = `image_${Date.now()}.jpg`;
-        const filePath = path.join(imagesDir, fileName);
-        fs.writeFileSync(filePath, response.data);
-
-        res.status(200).json({
-            status: "success",
-            message: `Image captured and saved as ${fileName}`,
-        });
-    } catch (error) {
-        console.error('Error capturing image:', error.message);
-        res.status(500).json({
-            status: "failure",
-            message: "Failed to capture image from camera",
-        });
-    }
+    res.status(200).json({
+        status: "success",
+        message: "All alarms deactivated",
+    });
 });
 
 // adds a notification to the queue
@@ -449,33 +229,11 @@ app.post ('/three_wrong_guesses', async (req, res) => {
       );
     io.emit('new-notification', notification);
 
-    // Trigger the front door alarm
-    const board = "FrontDoorESP32";
-
-    if (!knownBoards[board] || !boardStatus[board].state === "up") {
-        return res.status(400).json({
-            status: "failure",
-            message: `${board} is not registered or reachable.`,
-        });
+    if (send_deactivate_all_alamrs) {
+        send_deactivate_all_alamrs = false;
     }
 
-    try {
-        const boardIp = knownBoards[board];
-        const response = await axios.post(`http://${boardIp}/trigger_alarm`, {
-            action: "activate"
-        });
-
-        res.status(200).json({
-            status: "success",
-            message: `Alarm triggered on ${board}: ${response.data.message}`,
-        });
-    } catch (error) {
-        console.error(`Error triggering alarm on ${board}:`, error.message);
-        res.status(500).json({
-            status: "failure",
-            message: `Failed to trigger alarm on ${board}`,
-        });
-    }
+    send_activate_all_alarms = true;
 
     res.status(200).json({
         status: "success",
@@ -483,9 +241,63 @@ app.post ('/three_wrong_guesses', async (req, res) => {
     });
 });
 
+app.post('/send_status', (req, res) => {
+    const { name } = req.body;
+
+    console.log(`Received status from ${name}`);
+
+    if (!boardStatus[name]) {
+        return res.status(400).json({ status: 'failure', message: 'Unknown board name' });
+    }
+
+    boardStatus[name].lastUpdate = getCurrentTimestamp();
+
+    // Determine response based on global alarm states
+    if (name === 'ProximityBoard') {
+        boardStatus[name].lastUpdate = getCurrentTimestamp();
+        if (send_activate_all_alarms) {
+            send_activate_all_alarms = false;
+            return res.status(203).json({ command: 'activate_alarm' });
+        }
+        else if (send_deactivate_all_alamrs) {
+            send_deactivate_all_alamrs = false;
+            return res.status(204).json({ command: 'deactivate_alarm' });
+        }
+        else {
+            return res.status(202).json({ command: 'no_command' });
+        }
+
+    } else if (name === 'FrontDoorESP32') {
+        boardStatus[name].lastUpdate = getCurrentTimestamp();
+        if (send_activate_all_alarms) {
+            send_activate_all_alarms = false;
+            return res.status(203).json({ command: 'activate_alarm' });
+        }
+        else if (send_deactivate_all_alamrs) {
+            send_deactivate_all_alamrs = false;
+            return res.status(204).json({ command: 'deactivate_alarm' });
+        }
+        else {
+            return res.status(202).json({ command: 'no_command' });
+        }
+    } else {
+        // camera
+        boardStatus[name].lastUpdate = getCurrentTimestamp();
+    }
+    return res.status(202).json({ command: 'no_command' });
+});
+
+app.get('/get_esp_camera_address', (req, res) => {
+    // get address if available
+    if (knownBoards["EntranceCamera"]) {
+        return res.status(200).json({ address: knownBoards["EntranceCamera"] });
+    }
+    return res.status(400).json({ address: null });
+});
+
+
 // Start the server
 server.listen(port, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${port}`);
-    startHeartbeat();
 });
 

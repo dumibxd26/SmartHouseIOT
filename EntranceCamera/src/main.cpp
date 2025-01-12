@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include "esp_camera.h"
 #include "WiFi.h"
 #include "esp_http_server.h"
@@ -9,17 +10,12 @@
 #include "credentials.h"
 
 // Wi-Fi credentials
-const char *ssid_primary = SSID_PRIMARY;
-const char *password_primary = PASSWORD_PRIMARY;
-const char *ssid_secondary = SSID_SECONDARY;
-const char *password_secondary = PASSWORD_SECONDARY;
+const char *ssid = SSID;
+const char *password = PASSWORD;
+String hub_address = String(HUB);
 
-// Hub configuration
-const char *hub_primary = HUB_PRIMARY;     // Bound to primary network
-const char *hub_secondary = HUB_SECONDARY; // Bound to secondary network
-const char *PORT = PORT_C;
-String hub_address = "";
 const char *board_name = "EntranceCamera";
+int board_status_milis = 0;
 
 // HTTP server handle
 httpd_handle_t camera_httpd = NULL;
@@ -84,50 +80,13 @@ bool connectToWiFi(const char *ssid, const char *password)
     }
 }
 
-// Function to test hub connectivity
-bool testHubConnection(const char *hub_ip)
-{
-    HTTPClient http;
-    String test_url = String("http://") + hub_ip + ":" + PORT + "/test";
-    http.begin(test_url);
-    int httpCode = http.GET();
-    http.end();
-    return (httpCode == 200);
-}
-
-// Connect to the appropriate Wi-Fi and assign hub address
-void setupWiFiAndHub()
-{
-    if (connectToWiFi(ssid_primary, password_primary))
-    {
-        hub_address = hub_primary;
-    }
-    else if (connectToWiFi(ssid_secondary, password_secondary))
-    {
-        hub_address = hub_secondary;
-    }
-    else
-    {
-        Serial.println("Failed to connect to any Wi-Fi network. Halting...");
-        while (true)
-            ; // Halt execution if no Wi-Fi connection
-    }
-
-    if (!testHubConnection(hub_address.c_str()))
-    {
-        Serial.println("[ERROR] Hub connection failed. Retrying...");
-        while (true)
-            delay(5000); // Halt or retry logic
-    }
-}
-
 // Register the board with the hub
 void registerBoard()
 {
     if (hub_address == "")
         return;
     HTTPClient http;
-    http.begin(String("http://") + hub_address + ":" + PORT + "/register");
+    http.begin(hub_address + "/register");
     http.addHeader("Content-Type", "application/json");
 
     String payload = "{\"name\":\"" + String(board_name) + "\",\"ip\":\"" + WiFi.localIP().toString() + "\"}";
@@ -166,18 +125,10 @@ void startServer()
         .method = HTTP_GET,
         .handler = live_video_handler,
         .user_ctx = NULL};
-
-    httpd_uri_t test = {
-        .uri = "/test",
-        .method = HTTP_GET,
-        .handler = test_handler,
-        .user_ctx = NULL};
-
     if (httpd_start(&camera_httpd, &config) == ESP_OK)
     {
         httpd_register_uri_handler(camera_httpd, &capture_uri);
         httpd_register_uri_handler(camera_httpd, &live_video_uri);
-        httpd_register_uri_handler(camera_httpd, &test);
     }
 }
 
@@ -266,8 +217,19 @@ void setup()
             delay(1000); // Halt execution
         }
     }
-    // Connect to Wi-Fi and set hub address
-    setupWiFiAndHub();
+
+    if (connectToWiFi(ssid, password))
+    {
+        Serial.println("Wi-Fi connected.");
+    }
+    else
+    {
+        Serial.println("Wi-Fi connection failed.");
+        while (true)
+        {
+            delay(1000); // Halt execution
+        }
+    }
 
     registerBoard();
 
@@ -275,6 +237,25 @@ void setup()
     startServer();
 }
 
+static void send_board_status()
+{
+    HTTPClient http;
+    String url = hub_address + "/send_status";
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{\"message\":\"Board is up\", \"name\":\"" + String(board_name) + "\"}";
+
+    int httpCode = http.POST(payload);
+
+    http.end();
+}
+
 void loop()
 {
+    if (millis() - board_status_milis > 1000)
+    {
+        board_status_milis = millis();
+        send_board_status();
+    }
 }

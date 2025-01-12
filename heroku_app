@@ -7,3 +7,9 @@ heroku ps:scale web=1 -> start
 heroku ps
 
 heroku logs --tail
+
+curl -X POST https://murmuring-citadel-82885-21551507c6aa.herokuapp.com/movement_event \
+-H "Content-Type: application/json" \
+-d '{"distance": 50}'
+
+nslookup murmuring-citadel-82885-2155150.herokuapp.com
