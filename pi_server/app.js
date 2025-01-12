@@ -6,6 +6,7 @@ const axios = require('axios');
 const morgan = require('morgan');
 const cors = require('cors');
 const { Server } = require('socket.io');
+const http = require('http');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -27,6 +28,14 @@ cors: {
 });
 
 app.use(bodyParser.json());
+
+const generateNotification = (type, message) => ({
+    id: Date.now(),
+    type,
+    message,
+    timestamp: new Date().toISOString(),
+  });
+
 
 // Configurations
 
@@ -61,7 +70,7 @@ if (!fs.existsSync(imagesDir)) {
 
 // Dummy credentials for authentication
 const USERNAME = 'admin';
-const PASSWORD = 'password123';
+const PASSWORD = 'admin';
 
 // Login route
 app.post('/login', (req, res) => {
@@ -404,15 +413,8 @@ app.post('/capture_image', async (req, res) => {
 
 // adds a notification to the queue
 app.post('/front_door_alarm', async (req, res) => {
-
-    notificationQueue.push({
-        type: "triggered_alarm",
-        message: "Front Door Alarm Triggered",
-        timestamp: new Date().toISOString(),
-    });
-
-     // Emit the notification to all connected clients
-     io.emit('new-notification', notificationQueue);
+    const notification = generateNotification('front_door_alarm', 'Front Door Alarm Triggered');
+    io.emit('new-notification', notification);
 
     res.status(200).json({
         status: "success",
@@ -426,14 +428,11 @@ app.post('/movement_event', async (req, res) => {
 
 //    distance obtain from the proximity sensor
     const { distance } = req.body;
-
-    notificationQueue.push({
-        type: "movement_event",
-        message: `Movement Detected: ${distance} cm`,
-        timestamp: new Date().toISOString(),
-    });
-
-    io.emit('new-notification', notificationQueue);
+    const notification = generateNotification(
+        'movement_event',
+        `Movement Detected: ${distance} cm`
+      );
+    io.emit('new-notification', notification);
 
     res.status(200).json({
         status: "success",
@@ -444,13 +443,11 @@ app.post('/movement_event', async (req, res) => {
 // three_wrong_guesses activates all alarms
 // frontdoor alarm in this case because the proximity alarm is already activated
 app.post ('/three_wrong_guesses', async (req, res) => {
-    notificationQueue.push({
-        type: "three_wrong_guesses",
-        message: "Three Wrong Guesses on the Proximity Sensor",
-        timestamp: new Date().toISOString(),
-    });
-
-    io.emit('new-notification', notificationQueue);
+    const notification = generateNotification(
+        'three_wrong_guesses',
+        'Proximity sensor three wrong guesses'
+      );
+    io.emit('new-notification', notification);
 
     // Trigger the front door alarm
     const board = "FrontDoorESP32";

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './HomePage.css';
 import axios from 'axios';
 import NotificationBell from '../components/NotificationBell';
+import { useNavigate } from 'react-router-dom';
 
 function HomePage() {
   const [password, setPassword] = useState('');
@@ -11,6 +12,12 @@ function HomePage() {
   const [entranceEspStatus, setEntranceEspStatus] = useState('Checking...');
   const [proximityEspStatus, setProximityEspStatus] = useState('Checking...');
   const REQ_ADDRESS = 'https://murmuring-citadel-82885-21551507c6aa.herokuapp.com';
+
+  const navigate = useNavigate();
+
+  const handleSeeHistory = () => {
+    navigate('/notifications');
+  };
 
   // Function to check the status of the boards
   const checkStatus = async () => {
@@ -133,6 +140,9 @@ function HomePage() {
         <button className="secondary-button" onClick={handleDeactivateAlarms}>
           Deactivate All Alarms
         </button>
+        <button onClick={handleSeeHistory} className="close-button">
+        See history of alarms
+      </button>
       </div>
 
       {/* Modal for ESP32-CAM */}

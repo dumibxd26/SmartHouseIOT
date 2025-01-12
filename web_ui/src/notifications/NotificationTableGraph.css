@@ -1,0 +1,152 @@
+/* NotificationTableGraph.css */
+
+.notification-container {
+    width: 90%;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    text-align: center;
+  }
+  
+  .notification-title {
+    font-size: 2rem;
+    color: #333;
+    margin-bottom: 20px;
+  }
+  
+  .button-container {
+    margin-bottom: 20px;
+  }
+  
+  .view-button,
+  .mark-read-button {
+    padding: 10px 20px;
+    margin: 0 10px;
+    font-size: 1rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  .view-button {
+    background-color: #007bff;
+    color: #fff;
+  }
+  
+  .mark-read-button {
+    background-color: #28a745;
+    color: #fff;
+  }
+  
+  .view-button:hover {
+    background-color: #0056b3;
+  }
+  
+  .mark-read-button:hover {
+    background-color: #218838;
+  }
+  
+  .notification-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 1rem;
+    text-align: left;
+  }
+  
+  .notification-table th,
+  .notification-table td {
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+  }
+  
+  .notification-table th {
+    background-color: #007bff;
+    color: #fff;
+    text-align: center;
+  }
+  
+  .unread-row {
+    background-color: #f8d7da;
+  }
+  
+  .notification-table tbody tr:nth-of-type(even) {
+    background-color: #f3f3f3;
+  }
+  
+  .notification-table tbody tr:hover {
+    background-color: #ddd;
+  }
+  
+  .graph-container {
+    width: 100%;
+    height: auto;
+    margin-top: 20px;
+  }
+  
+  @media (max-width: 768px) {
+    .notification-table {
+      font-size: 0.9rem;
+    }
+  
+    .view-button,
+    .mark-read-button {
+      font-size: 0.9rem;
+      padding: 8px 15px;
+    }
+  }
+  
+  .filter-button {
+    padding: 10px 15px;
+    margin: 5px;
+    font-size: 1rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    background-color: #ffc107;
+    color: #000;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  .filter-button:hover {
+    background-color: #e0a800;
+  }
+  
+  /* Pagination Controls */
+.pagination-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 20px 0;
+  }
+  
+  .pagination-button {
+    padding: 8px 15px;
+    margin: 0 5px;
+    font-size: 1rem;
+    border: none;
+    border-radius: 5px;
+    background-color: #007bff;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .pagination-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+  
+  .pagination-button:hover:not(:disabled) {
+    background-color: #0056b3;
+  }
+  
+  .pagination-info {
+    font-size: 1rem;
+    color: #333;
+    margin: 0 10px;
+  }
+  

@@ -1,0 +1,9 @@
+murmuring-citadel-82885
+
+heroku ps:scale web=0 -> stop
+
+heroku ps:scale web=1 -> start
+
+heroku ps
+
+heroku logs --tail

@@ -1,40 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { io } from 'socket.io-client';
+import React, { useState } from 'react';
+import { useNotifications } from '../notifications/NotificationsState';
 import './NotificationBell.css';
 
-const SOCKET_URL = 'https://murmuring-citadel-82885-21551507c6aa.herokuapp.com/'; // Replace with your Heroku server URL
-
-function NotificationBell() {
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+const NotificationBell = () => {
+  const { notifications, unreadNotifications, markAsRead } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
 
-  useEffect(() => {
-    // Connect to WebSocket server
-    const socket = io(SOCKET_URL);
-
-    // Load notification history on connection
-    socket.on('notification-history', (data) => {
-      setNotifications(data);
-      setUnreadCount(data.length);
-    });
-
-    // Listen for new notifications
-    socket.on('new-notification', (data) => {
-      setNotifications(data);
-      setUnreadCount(data.length);
-    });
-
-    // Cleanup socket connection on unmount
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
-
-  // Mark all notifications as read
+  // Toggle dropdown and mark all notifications as read
   const handleOpenNotifications = () => {
     setIsOpen(!isOpen);
-    setUnreadCount(0); // Reset unread count
+
+    // Mark all unread notifications as read
+    unreadNotifications.forEach((notif) => markAsRead(notif.id));
   };
 
   return (
@@ -42,7 +19,7 @@ function NotificationBell() {
       {/* Bell Icon */}
       <div className="bell-icon" onClick={handleOpenNotifications}>
         🛎️
-        {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+        {unreadNotifications.length > 0 && <span className="badge">{unreadNotifications.length}</span>}
       </div>
 
       {/* Notification Dropdown */}
@@ -65,6 +42,6 @@ function NotificationBell() {
       )}
     </div>
   );
-}
+};
 
 export default NotificationBell;
