@@ -1,0 +1,83 @@
+/* General Notification Bell Styles */
+.notification-bell {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+    font-size: 1.5rem;
+  }
+  
+  /* Bell Icon */
+  .bell-icon {
+    position: relative;
+    font-size: 2rem;
+  }
+  
+  .bell-icon:hover {
+    color: #007bff;
+  }
+  
+  /* Badge for Unread Notifications */
+  .badge {
+    position: absolute;
+    top: -5px;
+    right: -10px;
+    background-color: #dc3545;
+    color: white;
+    border-radius: 50%;
+    padding: 0.2em 0.4em;
+    font-size: 0.8rem;
+    font-weight: bold;
+  }
+  
+  /* Dropdown List */
+  .dropdown {
+    position: absolute;
+    top: 2.5rem;
+    right: 0;
+    background: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    width: 300px;
+    z-index: 1000;
+  }
+  
+  .dropdown h3 {
+    margin: 0;
+    padding: 10px;
+    background: #007bff;
+    color: white;
+    font-size: 1.2rem;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+  }
+  
+  .dropdown ul {
+    list-style: none;
+    padding: 10px;
+    margin: 0;
+  }
+  
+  .dropdown li {
+    margin: 8px 0;
+    padding: 8px;
+    border-bottom: 1px solid #f1f1f1;
+  }
+  
+  .dropdown li:last-child {
+    border-bottom: none;
+  }
+  
+  .dropdown li strong {
+    display: block;
+  }
+  
+  .dropdown li em {
+    font-size: 0.8rem;
+    color: #666;
+  }
+  
+  .dropdown li:hover {
+    background: #f1f1f1;
+    cursor: pointer;
+  }
+  

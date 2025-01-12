@@ -5,17 +5,25 @@ const path = require('path');
 const axios = require('axios');
 const morgan = require('morgan');
 const cors = require('cors');
+const { Server } = require('socket.io');
 
 const app = express();
-const port = 5000;
+const port = process.env.PORT || 5000;
 
 // Middleware
 app.use(bodyParser.json());
 app.use(morgan('combined'));
 app.use(cors());
 
+// Attach Socket.IO to the server
+const io = new Server(server, {
+    cors: {
+      origin: '*', // Allow all origins (adjust this for production)
+      methods: ['GET', 'POST']
+    }
+  });
+
 // Configurations
-const PASSWORD = "secure_password"; // Change this to your secure password
 
 // In-Memory Data Structures
 const knownBoards = {
@@ -45,6 +53,33 @@ if (!fs.existsSync(imagesDir)) {
 }
 
 // HTTP Routes
+
+// Dummy credentials for authentication
+const USERNAME = 'admin';
+const PASSWORD = 'password123';
+
+// Login route
+app.post('/login', (req, res) => {
+  const { username, password } = req.body;
+
+  // Check if credentials match
+  if (username === USERNAME && password === PASSWORD) {
+    return res.status(200).json({ status: 'access', message: 'Login successful' });
+  } else {
+    return res.status(401).json({ status: 'denied', message: 'Invalid credentials' });
+  }
+});
+
+app.post('/check_password', (req, res) => {
+    const { password } = req.body;
+
+    // Check if password matches
+    if (password === PASSWORD) {
+        return res.status(200).json({ status: 'success', message: 'Password is correct' });
+    } else {
+        return res.status(401).json({ status: 'failure', message: 'Incorrect password' });
+    }
+});
 
 // Helper function to send heartbeat
 const checkBoardState = async (boardName, boardIP) => {
@@ -371,6 +406,9 @@ app.post('/front_door_alarm', async (req, res) => {
         timestamp: new Date().toISOString(),
     });
 
+     // Emit the notification to all connected clients
+     io.emit('new-notification', notificationQueue);
+
     res.status(200).json({
         status: "success",
         message: "Front Door Alarm Triggered",
@@ -390,6 +428,8 @@ app.post('/movement_event', async (req, res) => {
         timestamp: new Date().toISOString(),
     });
 
+    io.emit('new-notification', notificationQueue);
+
     res.status(200).json({
         status: "success",
         message: "Movement Detected",
@@ -401,9 +441,11 @@ app.post('/movement_event', async (req, res) => {
 app.post ('/three_wrong_guesses', async (req, res) => {
     notificationQueue.push({
         type: "three_wrong_guesses",
-        message: "Three Wrong Guesses",
+        message: "Three Wrong Guesses on the Proximity Sensor",
         timestamp: new Date().toISOString(),
     });
+
+    io.emit('new-notification', notificationQueue);
 
     // Trigger the front door alarm
     const board = "FrontDoorESP32";

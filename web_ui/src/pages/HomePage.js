@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './HomePage.css';
 import axios from 'axios';
+import NotificationBell from '../components/NotificationBell';
 
 function HomePage() {
   const [password, setPassword] = useState('');
@@ -9,13 +10,12 @@ function HomePage() {
   const [esp32camStatus, setEsp32camStatus] = useState('Checking...');
   const [entranceEspStatus, setEntranceEspStatus] = useState('Checking...');
   const [proximityEspStatus, setProximityEspStatus] = useState('Checking...');
-  const HUB_IP = '192.168.1.100';
-  const HUB_PORT = '5000';
+  const REQ_ADDRESS = 'https://murmuring-citadel-82885-21551507c6aa.herokuapp.com';
 
   // Function to check the status of the boards
   const checkStatus = async () => {
     try {
-      const response = await axios.get(`http://${HUB_IP}:${HUB_PORT}/board_statuses`);
+      const response = await axios.get(`${REQ_ADDRESS}/board_statuses`);
       setHubStatus('Online');
       setEsp32camStatus(response.data.boardStatuses.EntranceCamera.state);
       setEntranceEspStatus(response.data.boardStatuses.FrontDoorESP32.state);
@@ -29,27 +29,35 @@ function HomePage() {
   };
 
   useEffect(() => {
-    checkStatus(); 
+    checkStatus();
     const interval = setInterval(() => {
       checkStatus();
-    }, 5000); 
+    }, 5000);
 
-    // Cleanup interval on component unmount
     return () => clearInterval(interval);
   }, []);
 
   // Activate alarms
   const handleActivateAlarms = async () => {
     const pass = prompt('Enter Password:');
-    if (!pass) return;
-
+    
+    // make a checkpassword request
+    // if it returns true, then activate all alarms
+    // else return an error message
     try {
-      await axios.post(`http://${HUB_IP}:${HUB_PORT}/trigger_all_alarms`, { password: pass });
-      alert('All alarms activated.');
-    } catch (error) {
+      const response = await axios.post(`${REQ_ADDRESS}/check_password`, { password: pass });
+      if (response.status === 200) {
+        await axios.post(`${REQ_ADDRESS}/trigger_all_alarms`, { password: pass });
+        alert('All alarms activated.');
+      } else {
+        alert('Incorrect password');
+      }
+    }
+    catch (error) {
       alert('Failed to activate alarms.');
     }
   };
+
 
   // Deactivate alarms
   const handleDeactivateAlarms = async () => {
@@ -57,7 +65,7 @@ function HomePage() {
     if (!pass) return;
 
     try {
-      await axios.post(`http://${HUB_IP}:${HUB_PORT}/deactivate_all_alarms`, { password: pass });
+      await axios.post(`${REQ_ADDRESS}/deactivate_all_alarms`, { password: pass });
       alert('All alarms deactivated.');
     } catch (error) {
       alert('Failed to deactivate alarms.');
@@ -65,11 +73,11 @@ function HomePage() {
   };
 
   // Live Camera
-  const handleLiveCamera = async () => {
+  const handleLiveCamera = () => {
     const pass = prompt('Enter Password:');
     if (!pass) return;
 
-    window.open(`http://${HUB_IP}:${HUB_PORT}/live_video`, '_blank');
+    window.open(`${REQ_ADDRESS}/live_video`, '_blank');
   };
 
   // Capture Image
@@ -78,7 +86,7 @@ function HomePage() {
     if (!pass) return;
 
     try {
-      const response = await axios.post(`http://${HUB_IP}:${HUB_PORT}/capture_image`, { password: pass });
+      const response = await axios.post(`${REQ_ADDRESS}/capture_image`, { password: pass });
       alert(response.data.message);
     } catch (error) {
       alert('Failed to capture image.');
@@ -86,35 +94,43 @@ function HomePage() {
   };
 
   return (
-    <div>
-      <h1>Smart House Dashboard</h1>
+    <div className="homepage">
+      
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px' }}>
+      <h1 style={{ color: 'white' }}>Smart House Dashboard</h1>
+        <NotificationBell />
+      </header>
 
-      {/* Status Boxes */}
-      <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '20px' }}>
-        <div className="status-box">
-          <h3>Hub Status</h3>
+      {/* Status Grid */}
+      <div className="status-grid">
+        <div className={`status-box ${hubStatus === 'Online' ? 'online' : 'offline'}`}>
+          <h3>Hub<br/>Status</h3>
           <p>{hubStatus}</p>
         </div>
-        <div className="status-box" onClick={() => setShowModal(true)} style={{ cursor: 'pointer' }}>
+        <div
+          className={`status-box ${esp32camStatus === 'up' ? 'online' : 'offline'}`}
+          onClick={() => setShowModal(true)}
+          style={{ cursor: 'pointer' }}
+        >
           <h3>ESP32-CAM Status</h3>
           <p>{esp32camStatus}</p>
         </div>
-        <div className="status-box">
+        <div className={`status-box ${entranceEspStatus === 'up' ? 'online' : 'offline'}`}>
           <h3>Entrance ESP32 Status</h3>
           <p>{entranceEspStatus}</p>
         </div>
-        <div className="status-box">
+        <div className={`status-box ${proximityEspStatus === 'up' ? 'online' : 'offline'}`}>
           <h3>Proximity ESP32 Status</h3>
           <p>{proximityEspStatus}</p>
         </div>
       </div>
 
       {/* Activate/Deactivate Alarms */}
-      <div style={{ textAlign: 'center', marginTop: '40px' }}>
-        <button onClick={handleActivateAlarms} style={{ margin: '10px', padding: '10px 20px' }}>
+      <div className="actions">
+        <button className="primary-button" onClick={handleActivateAlarms}>
           Activate All Alarms
         </button>
-        <button onClick={handleDeactivateAlarms} style={{ margin: '10px', padding: '10px 20px' }}>
+        <button className="secondary-button" onClick={handleDeactivateAlarms}>
           Deactivate All Alarms
         </button>
       </div>
@@ -124,13 +140,13 @@ function HomePage() {
         <div className="modal">
           <div className="modal-content">
             <h2>ESP32-CAM Actions</h2>
-            <button onClick={handleLiveCamera} style={{ margin: '10px' }}>
+            <button className="primary-button" onClick={handleLiveCamera}>
               Live Camera
             </button>
-            <button onClick={handleCaptureImage} style={{ margin: '10px' }}>
+            <button className="secondary-button" onClick={handleCaptureImage}>
               Capture Image
             </button>
-            <button onClick={() => setShowModal(false)} style={{ marginTop: '20px' }}>
+            <button className="close-button" onClick={() => setShowModal(false)}>
               Close
             </button>
           </div>
