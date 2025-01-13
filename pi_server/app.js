@@ -19,6 +19,7 @@ app.use(cors());
 // Global Variables
 let send_activate_all_alarms = false;
 let send_deactivate_all_alamrs = false;
+let send_open_door = false;
 
 // Create an HTTP server and bind it to the express app
 const server = http.createServer(app);
@@ -277,7 +278,10 @@ app.post('/send_status', (req, res) => {
             send_deactivate_all_alamrs = false;
             return res.status(204).json({ command: 'deactivate_alarm' });
         }
-        else {
+        else if (send_open_door) {
+            send_open_door = false;
+            return res.status(205).json({ command: 'open_door' });
+        } else {
             return res.status(202).json({ command: 'no_command' });
         }
     } else {
@@ -293,6 +297,14 @@ app.get('/get_esp_camera_address', (req, res) => {
         return res.status(200).json({ address: knownBoards["EntranceCamera"] });
     }
     return res.status(400).json({ address: null });
+});
+
+app.get('/open_door', async (req, res) => {
+    send_open_door = true;
+    res.status(200).json({
+        status: "success",
+        message: "Door opened",
+    });
 });
 
 

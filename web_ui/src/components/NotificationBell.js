@@ -11,7 +11,6 @@ const NotificationBell = () => {
   const handleOpenNotifications = () => {
     setIsOpen(!isOpen);
 
-    // Mark all unread notifications as read
     unreadNotifications.forEach((notif) => markAsRead(notif.id));
   };
 
@@ -39,7 +38,8 @@ const NotificationBell = () => {
               <li>No notifications</li>
             )} */}
 
-            {notifications.slice(0, max_visible_notifications).map((notif) => (
+            {notifications.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+              .slice(0, max_visible_notifications).map((notif) => (
               <li key={notif.id}>
                 <strong>{notif.message}</strong>
                 <em>{new Date(notif.timestamp).toLocaleString()}</em>

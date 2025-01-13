@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 function HomePage() {
   const [password, setPassword] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showEntranceModal, setShowEntranceModal] = useState(false);
   const [hubStatus, setHubStatus] = useState('Checking...');
   const [esp32camStatus, setEsp32camStatus] = useState('Checking...');
   const [entranceEspStatus, setEntranceEspStatus] = useState('Checking...');
@@ -43,6 +44,23 @@ function HomePage() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Open Door
+  const handleOpenDoor = async () => {
+    const pass = prompt('Enter Password:');
+
+    try {
+      const response = await axios.post(`${REQ_ADDRESS}/check_password`, { password: pass });
+      if (response.status === 200) {
+        await axios.get(`${REQ_ADDRESS}/open_door`);
+        alert('Door opened.');
+      } else {
+        alert('Incorrect password');
+      }
+    } catch (error) {
+      alert('Failed to open door.');
+    }
+  };
 
   // Activate alarms
   const handleActivateAlarms = async () => {
@@ -83,25 +101,44 @@ function HomePage() {
   };
 
   // Live Camera
-  const handleLiveCamera = () => {
+  const handleLiveCamera = async () => {
     const pass = prompt('Enter Password:');
-    if (!pass) return;
+    
+    try {
+      const is_password_correct = await axios.post(`${REQ_ADDRESS}/check_password`, { password: pass });
+      if (is_password_correct) {
+        // obtain esp32 camera from  get_esp_camera_address
+        // and open the camera in a new tab
+        const response = await axios.get(`${REQ_ADDRESS}/get_esp_camera_address`);
+        console.log(response);
 
-    window.open(`${REQ_ADDRESS}/live_video`, '_blank');
+        if (response.status === 200) {
+          // window.open(response.data.cameraAddress, '_blank');
+          // also open on route /live_video
+          console.log("http://" + response.data.address + "/live_video");
+          window.open("http://" + response.data.address + "/live_video", '_blank');
+        }
+      } else {
+        alert('Incorrect password');
+      }
+    }
+    catch {
+      alert('Failed to open camera.');
+    }
   };
 
   // Capture Image
-  const handleCaptureImage = async () => {
-    const pass = prompt('Enter Password:');
-    if (!pass) return;
+  // const handleCaptureImage = async () => {
+  //   const pass = prompt('Enter Password:');
+  //   if (!pass) return;
 
-    try {
-      const response = await axios.post(`${REQ_ADDRESS}/capture_image`, { password: pass });
-      alert(response.data.message);
-    } catch (error) {
-      alert('Failed to capture image.');
-    }
-  };
+  //   try {
+  //     const response = await axios.post(`${REQ_ADDRESS}/capture_image`, { password: pass });
+  //     alert(response.data.message);
+  //   } catch (error) {
+  //     alert('Failed to capture image.');
+  //   }
+  // };
 
   return (
     <div className="homepage">
@@ -125,7 +162,7 @@ function HomePage() {
           <h3>ESP32-CAM Status</h3>
           <p>{esp32camStatus}</p>
         </div>
-        <div className={`status-box ${entranceEspStatus === 'up' ? 'online' : 'offline'}`}>
+        <div className={`status-box ${entranceEspStatus === 'up' ? 'online' : 'offline'}`} onClick={() => setShowEntranceModal(true)}>
           <h3>Entrance ESP32 Status</h3>
           <p>{entranceEspStatus}</p>
         </div>
@@ -156,10 +193,25 @@ function HomePage() {
             <button className="primary-button" onClick={handleLiveCamera}>
               Live Camera
             </button>
-            <button className="secondary-button" onClick={handleCaptureImage}>
+            {/* <button className="secondary-button" onClick={handleCaptureImage}>
               Capture Image
-            </button>
+            </button> */}
             <button className="close-button" onClick={() => setShowModal(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Entrance Esp32 */}
+      {showEntranceModal && (
+        <div className="modal">
+          <div className="modal-content">
+            <h2>Entrance ESP32 Actions</h2>
+            <button className="primary-button" onClick={handleOpenDoor}>
+              Open Door
+            </button>
+            <button className="close-button" onClick={() => setShowEntranceModal(false)}>
               Close
             </button>
           </div>

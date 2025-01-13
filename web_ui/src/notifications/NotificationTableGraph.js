@@ -35,44 +35,70 @@ const NotificationTableGraph = () => {
       front_door_alarm: {},
     };
 
-    const isWithinTimeRange = (timestamp) => {
-      const eventTime = new Date(timestamp);
+    // Generate all labels for the time range
+    let labels = [];
+    if (timeRange === 'lastHour') {
+      labels = Array.from({ length: 60 }, (_, i) => {
+        const date = new Date(now.getTime() - (59 - i) * 60 * 1000);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      });
+    } else if (timeRange === 'lastDay') {
+      labels = Array.from({ length: 24 }, (_, i) => {
+        const date = new Date(now.getTime() - (23 - i) * 60 * 60 * 1000);
+        return date.toLocaleTimeString([], { hour: '2-digit' });
+      });
+    } else if (timeRange === 'lastMonth') {
+      labels = Array.from({ length: 30 }, (_, i) => {
+        const date = new Date(now.getTime() - (29 - i) * 24 * 60 * 60 * 1000);
+        return date.toLocaleDateString([], { day: '2-digit', month: 'short' });
+      });
+    } else if (timeRange === 'lastYear') {
+      labels = Array.from({ length: 12 }, (_, i) => {
+        const date = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+        return date.toLocaleDateString([], { month: 'short' });
+      });
+    }
 
-      switch (timeRange) {
-        case 'lastHour':
-          return now - eventTime <= 60 * 60 * 1000; // Last 1 hour
-        case 'lastDay':
-          return now - eventTime <= 24 * 60 * 60 * 1000; // Last 24 hours
-        case 'lastMonth':
-          const oneMonthAgo = new Date();
-          oneMonthAgo.setMonth(now.getMonth() - 1);
-          return eventTime >= oneMonthAgo;
-        case 'lastYear':
-          const oneYearAgo = new Date();
-          oneYearAgo.setFullYear(now.getFullYear() - 1);
-          return eventTime >= oneYearAgo;
-        default:
-          return false;
-      }
-    };
+    // Initialize data with zero counts for all labels
+    Object.keys(filteredData).forEach((type) => {
+      labels.forEach((label) => {
+        filteredData[type][label] = 0;
+      });
+    });
 
+    // Filter and group notifications
     notifications
-      .filter((notif) => isWithinTimeRange(notif.timestamp))
+      .filter((notif) => {
+        const eventTime = new Date(notif.timestamp);
+        switch (timeRange) {
+          case 'lastHour':
+            return now - eventTime <= 60 * 60 * 1000;
+          case 'lastDay':
+            return now - eventTime <= 24 * 60 * 60 * 1000;
+          case 'lastMonth':
+            return now - eventTime <= 30 * 24 * 60 * 60 * 1000;
+          case 'lastYear':
+            return now - eventTime <= 365 * 24 * 60 * 60 * 1000;
+          default:
+            return false;
+        }
+      })
       .forEach((notif) => {
         const eventTime = new Date(notif.timestamp);
         let key;
+
         switch (timeRange) {
           case 'lastHour':
-            key = eventTime.toISOString().substring(14, 16); // Minutes
+            key = eventTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             break;
           case 'lastDay':
-            key = eventTime.toISOString().substring(11, 13); // Hours
+            key = eventTime.toLocaleTimeString([], { hour: '2-digit' });
             break;
           case 'lastMonth':
-            key = eventTime.toISOString().substring(8, 10); // Days
+            key = eventTime.toLocaleDateString([], { day: '2-digit', month: 'short' });
             break;
           case 'lastYear':
-            key = eventTime.toISOString().substring(5, 7); // Months
+            key = eventTime.toLocaleDateString([], { month: 'short' });
             break;
           default:
             key = '';
@@ -88,7 +114,7 @@ const NotificationTableGraph = () => {
     const filteredData = filterNotifications(timeRange);
 
     const datasets = Object.keys(filteredData).map((type) => {
-      const labels = Object.keys(filteredData[type]).sort();
+      const labels = Object.keys(filteredData[type]);
       const data = labels.map((label) => filteredData[type][label]);
 
       const colors = {
@@ -102,10 +128,11 @@ const NotificationTableGraph = () => {
         data,
         backgroundColor: colors[type].background,
         borderColor: colors[type].border,
+        borderWidth: 2,
       };
     });
 
-    const labels = Object.keys(filteredData.movement_event).sort(); // Use movement_event labels for X-axis
+    const labels = Object.keys(filteredData.movement_event || {});
 
     return {
       labels,
@@ -180,7 +207,7 @@ const NotificationTableGraph = () => {
         </div>
       ) : (
         <div className="graph-container">
-          <Line data={getGraphData()} />
+          <Line data={getGraphData()} options={{ responsive: true }} />
         </div>
       )}
     </div>
